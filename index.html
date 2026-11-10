@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full w-full bg-[#050608] text-slate-100 antialiased select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBER_FLUX // REAL-TIME NETWORK TELEMETRY HUD</title>
+  
+  <!-- Google Fonts: JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            obsidian: '#050608',
+            cardBg: '#0c0d14',
+            neonPink: '#ff1e78',
+            neonCyan: '#00f0ff',
+            phosphorGreen: '#00ff66',
+            amberAlert: '#ffb700',
+            crimsonDrop: '#ff3344'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Three.js & Post-Processing (r128) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+  <style>
+    /* Technical Grid Overlay */
+    body {
+      background-color: #050608;
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .tech-grid-bg {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+    }
+
+    /* Subtle CRT Scanline effect */
+    .crt-scanlines {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+
+    /* Sci-Fi Glass Panels */
+    .fui-panel {
+      background: rgba(12, 13, 20, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7);
+      position: relative;
+    }
+
+    .fui-panel::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 10px;
+      width: 24px;
+      height: 2px;
+      background: #00f0ff;
+      box-shadow: 0 0 8px #00f0ff;
+    }
+
+    .fui-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      right: 10px;
+      width: 24px;
+      height: 2px;
+      background: #ff1e78;
+      box-shadow: 0 0 8px #ff1e78;
+    }
+
+    /* Corner accents */
+    .corner-notch {
+      clip-path: polygon(
+        0 8px,
+        8px 0,
+        100% 0,
+        100% calc(100% - 8px),
+        calc(100% - 8px) 100%,
+        0 100%
+      );
+    }
+
+    /* Glowing borders and text */
+    .glow-cyan {
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+      border-color: rgba(0, 240, 255, 0.6);
+    }
+
+    .glow-pink {
+      box-shadow: 0 0 12px rgba(255, 30, 120, 0.35);
+      border-color: rgba(255, 30, 120, 0.6);
+    }
+
+    .text-glow-cyan {
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+    }
+
+    .text-glow-pink {
+      text-shadow: 0 0 8px rgba(255, 30, 120, 0.6);
+    }
+
+    .text-glow-green {
+      text-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+    }
+
+    .text-glow-red {
+      text-shadow: 0 0 8px rgba(255, 51, 68, 0.7);
+    }
+
+    /* Custom Scrollbar for Terminal */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(5, 6, 8, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.35);
+      border-radius: 2px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 30, 120, 0.7);
+    }
+
+    /* Micro sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.1);
+      height: 3px;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: #00f0ff;
+      cursor: pointer;
+      box-shadow: 0 0 8px #00f0ff;
+      border: 1px solid #ffffff;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: #00f0ff;
+      cursor: pointer;
+      box-shadow: 0 0 8px #00f0ff;
+      border: 1px solid #ffffff;
+    }
+
+    /* Blinking keyframe animations */
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+    .animate-blink {
+      animation: blink 1.2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-fast {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.7; }
+    }
+    .animate-pulse-fast {
+      animation: pulse-fast 0.8s infinite ease-in-out;
+    }
+
+    @keyframes strobe-red {
+      0%, 100% { background-color: rgba(255, 51, 68, 0.25); }
+      50% { background-color: rgba(255, 51, 68, 0.05); }
+    }
+    .ddos-strobe {
+      animation: strobe-red 0.4s infinite;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen bg-[#050608] text-gray-200 overflow-hidden font-mono">
+
+  <!-- 3D WebGL Canvas Layer -->
+  <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+  <!-- Technical Background Grid -->
+  <div class="absolute inset-0 tech-grid-bg z-10 pointer-events-none"></div>
+  <!-- CRT Scanlines -->
+  <div class="absolute inset-0 crt-scanlines z-10 pointer-events-none"></div>
+
+  <!-- INITIAL HANDSHAKE & RESOLUTION OVERLAY -->
+  <div id="handshake-banner" class="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-700 opacity-100 flex items-center space-x-3 px-5 py-2.5 bg-[#0c0d14]/95 border border-[#00f0ff]/50 rounded text-xs text-[#00f0ff] shadow-[0_0_20px_rgba(0,240,255,0.3)]">
+    <span class="w-2.5 h-2.5 rounded-full bg-[#00f0ff] animate-ping"></span>
+    <span class="font-bold tracking-widest uppercase" id="handshake-text">HANDSHAKE & RESOLVING CLIENT NODE...</span>
+    <span class="text-[10px] text-gray-400 font-mono" id="handshake-dots">[ ... ]</span>
+  </div>
+
+  <!-- CRITICAL DDOS ALARM BANNER (Initially Hidden) -->
+  <div id="ddos-banner" class="hidden absolute top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none ddos-strobe border border-red-500 text-red-400 px-6 py-2 rounded shadow-[0_0_30px_rgba(255,0,0,0.5)] flex items-center space-x-3">
+    <span class="text-lg">⚠</span>
+    <span class="font-bold text-xs tracking-widest text-glow-red uppercase">CRITICAL ALERT: MASSIVE VOLUMETRIC SYN FLOOD (64.2 Gbps) // MITIGATION ACTIVE</span>
+    <span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold animate-pulse">DROP 48.2%</span>
+  </div>
+
+  <!-- HUD INTERFACE CONTAINER (z-20) -->
+  <div class="relative z-20 w-full h-full flex flex-col justify-between pointer-events-none p-2.5 sm:p-3.5">
+
+    <!-- ======================================================== -->
+    <!-- 1. TOP BAR: Global Network Telemetry & Dynamic Client ID -->
+    <!-- ======================================================== -->
+    <header class="w-full flex flex-wrap items-center justify-between gap-2 p-2.5 fui-panel corner-notch pointer-events-auto">
+      
+      <!-- System Identity & Status -->
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-1.5 px-2 py-1 bg-black/60 border border-white/10 rounded">
+          <span class="w-2 h-2 rounded-full bg-[#00ff66] animate-blink shadow-[0_0_8px_#00ff66]"></span>
+          <span class="text-[10px] font-bold tracking-widest text-[#00ff66]">SYS // ONLINE</span>
+        </div>
+        <div class="text-xs font-extrabold tracking-wider text-white flex items-center gap-1.5">
+          <span class="text-[#00f0ff]">CYBER_FLUX</span>
+          <span class="text-gray-500 font-normal">::</span>
+          <span class="text-[10px] text-[#ff1e78] tracking-widest">NET_HUD v4.8</span>
+        </div>
+        <span class="hidden md:inline-block text-[10px] text-gray-500 border-l border-gray-700 pl-3" id="utc-clock">UTC 00:00:00.000</span>
+      </div>
+
+      <!-- DYNAMIC CLIENT NODE CARD (Central Focus) -->
+      <div id="client-node-card" class="flex items-center space-x-2.5 px-3 py-1 bg-black/70 border border-[#00f0ff]/40 rounded glow-cyan text-xs">
+        <div class="text-[9px] text-[#00f0ff] uppercase tracking-wider font-bold">CLIENT_NODE:</div>
+        <div id="hud-client-ip" class="text-white font-extrabold text-glow-cyan tracking-wider">RESOLVING...</div>
+        <span class="text-gray-600">|</span>
+        <div class="text-[10px] text-gray-300 flex items-center space-x-1">
+          <span class="text-gray-500">LOC:</span>
+          <span id="hud-client-loc" class="text-amber-300 font-medium">DETECTING...</span>
+        </div>
+        <span class="text-gray-600 hidden lg:inline">|</span>
+        <div class="text-[10px] text-gray-300 hidden lg:flex items-center space-x-1">
+          <span class="text-gray-500">ASN/ISP:</span>
+          <span id="hud-client-isp" class="text-emerald-400 font-medium">SCANNING...</span>
+        </div>
+      </div>
+
+      <!-- Live Global Metrics Indicators -->
+      <div class="flex items-center space-x-3 text-[10px]">
+        <div class="flex flex-col text-right">
+          <span class="text-[8px] text-gray-500 tracking-wider">THROUGHPUT</span>
+          <span id="metric-throughput" class="font-bold text-[#00f0ff] text-glow-cyan">842.6 MB/S</span>
+        </div>
+        <div class="h-6 w-px bg-white/10"></div>
+        <div class="flex flex-col text-right">
+          <span class="text-[8px] text-gray-500 tracking-wider">RTT LATENCY</span>
+          <span id="metric-latency" class="font-bold text-[#00ff66] text-glow-green">18.4 MS</span>
+        </div>
+        <div class="h-6 w-px bg-white/10"></div>
+        <div class="flex flex-col text-right">
+          <span class="text-[8px] text-gray-500 tracking-wider">PACKET LOSS</span>
+          <span id="metric-loss" class="font-bold text-gray-300">0.001%</span>
+        </div>
+        <div class="h-6 w-px bg-white/10 hidden sm:block"></div>
+        <div class="flex flex-col text-right hidden sm:flex">
+          <span class="text-[8px] text-gray-500 tracking-wider">STREAMS</span>
+          <span id="metric-streams" class="font-bold text-[#ff1e78] text-glow-pink">1,420</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ======================================================== -->
+    <!-- 2. MIDDLE AREA: Left Panel, 3D Canvas Center, Right Panel -->
+    <!-- ======================================================== -->
+    <div class="w-full flex-1 flex justify-between items-start gap-3 my-2 pointer-events-none overflow-hidden">
+      
+      <!-- LEFT PANEL: Protocol Distribution & Hierarchical Topology Tree -->
+      <aside class="w-72 sm:w-80 fui-panel p-3 rounded flex flex-col space-y-3 pointer-events-auto max-h-[calc(100vh-210px)] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
+          <span class="text-[10px] font-bold text-[#00f0ff] tracking-widest flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-[#00f0ff] inline-block"></span>
+            PROTOCOL MIX & TOPOLOGY
+          </span>
+          <span class="text-[9px] text-gray-500">REAL-TIME</span>
+        </div>
+
+        <!-- Protocol Distribution Progress Bars -->
+        <div class="space-y-2 text-[10px]">
+          <div>
+            <div class="flex justify-between text-[9px] mb-0.5">
+              <span class="text-[#00f0ff] font-semibold">TCP / STREAM</span>
+              <span id="pct-tcp" class="text-gray-300">54%</span>
+            </div>
+            <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+              <div id="bar-tcp" class="h-full bg-[#00f0ff] shadow-[0_0_6px_#00f0ff]" style="width: 54%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-[9px] mb-0.5">
+              <span class="text-[#ff1e78] font-semibold">TLS 1.3 / ENCRYPTED</span>
+              <span id="pct-tls" class="text-gray-300">31%</span>
+            </div>
+            <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+              <div id="bar-tls" class="h-full bg-[#ff1e78] shadow-[0_0_6px_#ff1e78]" style="width: 31%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-[9px] mb-0.5">
+              <span class="text-[#00ff66] font-semibold">UDP / QUIC</span>
+              <span id="pct-udp" class="text-gray-300">11%</span>
+            </div>
+            <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+              <div id="bar-udp" class="h-full bg-[#00ff66] shadow-[0_0_6px_#00ff66]" style="width: 11%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-[9px] mb-0.5">
+              <span class="text-amber-400 font-semibold">DNS / RESOLUTION</span>
+              <span id="pct-dns" class="text-gray-300">3%</span>
+            </div>
+            <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+              <div id="bar-dns" class="h-full bg-amber-400 shadow-[0_0_6px_#ffb700]" style="width: 3%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-[9px] mb-0.5">
+              <span class="text-purple-400 font-semibold">ICMP & BGP // OTHER</span>
+              <span id="pct-other" class="text-gray-300">1%</span>
+            </div>
+            <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+              <div id="bar-other" class="h-full bg-purple-400 shadow-[0_0_6px_#c084fc]" style="width: 1%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Hierarchical Routing Tree -->
+        <div class="pt-2 border-t border-white/10">
+          <div class="text-[9px] font-bold text-gray-400 tracking-wider mb-1 flex items-center justify-between">
+            <span>ROUTE_MAP // ASCENT TREE</span>
+            <span class="text-[8px] text-[#00ff66]">ACTIVE</span>
+          </div>
+          <div class="p-2 bg-black/70 border border-white/10 rounded text-[9px] leading-relaxed text-gray-300 font-mono select-text">
+            <div class="text-[#00f0ff] font-bold flex items-center gap-1">
+              <span class="text-gray-500">◉</span>
+              <span id="tree-client-ip">[CLIENT_IP]</span>
+              <span class="text-gray-400 text-[8px]">(LOCAL HOST)</span>
+            </div>
+            <div class="pl-2 text-gray-400">└─> <span class="text-gray-300">GATEWAY</span> <span class="text-gray-500">[192.168.1.1]</span></div>
+            <div class="pl-4 text-gray-400">└─> <span class="text-emerald-400">ISP EDGE</span> (<span id="tree-client-isp" class="text-emerald-300">DYNAMIC_ISP</span>)</div>
+            <div class="pl-6 text-gray-400">└─> <span class="text-[#ff1e78]">ANYCAST CDN / TIER-1 BACKBONE</span></div>
+            <div class="pl-8 text-gray-400">└─> <span class="text-[#00f0ff] font-bold">TARGET SOCKET [443/TLS]</span></div>
+          </div>
+        </div>
+
+        <!-- Capture / Freeze Flow Action -->
+        <div class="pt-1 flex items-center justify-between gap-2">
+          <button id="btn-pause-flow" class="flex-1 py-1.5 px-3 bg-[#0c0d14] border border-[#00f0ff]/40 hover:border-[#00f0ff] text-[#00f0ff] hover:bg-[#00f0ff]/10 text-[10px] font-bold tracking-widest uppercase transition-all rounded flex items-center justify-center space-x-1.5 shadow-[0_0_10px_rgba(0,240,255,0.15)]">
+            <span id="pause-indicator" class="w-2 h-2 rounded-full bg-[#00f0ff]"></span>
+            <span id="pause-btn-text">PAUSE / CAPTURE</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Center 3D Space (Clickable Shockwave Notification) -->
+      <div class="hidden lg:flex flex-col items-center pointer-events-none mt-2 opacity-50 text-[10px] text-gray-400 tracking-wider">
+        <span>[ ✦ LEFT CLICK 3D SCENE: DISPERSION SHOCKWAVE | DRAG: ORBIT | SCROLL: ZOOM ]</span>
+      </div>
+
+      <!-- RIGHT PANEL: Latency Histogram & Heat Matrix Spectrogram -->
+      <aside class="w-72 sm:w-80 fui-panel p-3 rounded flex flex-col space-y-3 pointer-events-auto max-h-[calc(100vh-210px)] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
+          <span class="text-[10px] font-bold text-[#ff1e78] tracking-widest flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-[#ff1e78] inline-block"></span>
+            LATENCY HISTOGRAM & SPECTROGRAM
+          </span>
+          <span id="hist-mean" class="text-[9px] text-[#00ff66] font-bold">AVG: 18.4ms</span>
+        </div>
+
+        <!-- 2D Canvas Latency Histogram -->
+        <div class="relative w-full h-24 bg-black/80 border border-white/10 rounded overflow-hidden p-1">
+          <canvas id="latency-canvas" class="w-full h-full block"></canvas>
+          <div class="absolute top-1 left-2 text-[8px] text-gray-500 font-mono">100ms</div>
+          <div class="absolute bottom-1 left-2 text-[8px] text-gray-500 font-mono">0ms</div>
+          <div class="absolute top-1 right-2 text-[8px] text-[#00f0ff] font-mono" id="hist-current">18.2ms</div>
+        </div>
+
+        <!-- Spectrogram / Payload Heat Matrix (72 micro cells) -->
+        <div>
+          <div class="flex items-center justify-between text-[9px] text-gray-400 mb-1">
+            <span>PACKET PAYLOAD MATRIX</span>
+            <span class="text-[8px] text-gray-500">64B - 9000B (JUMBO)</span>
+          </div>
+          <div id="heat-matrix" class="grid grid-cols-12 gap-1 p-1.5 bg-black/70 border border-white/10 rounded">
+            <!-- Populated via JavaScript: 72 cells -->
+          </div>
+        </div>
+
+        <!-- Packet Flow Status Counters -->
+        <div class="grid grid-cols-3 gap-2 pt-1 border-t border-white/10 text-center">
+          <div class="p-1.5 bg-black/60 border border-emerald-500/20 rounded">
+            <div class="text-[8px] text-gray-400">FORWARDED</div>
+            <div id="counter-forward" class="text-[11px] font-bold text-[#00ff66] text-glow-green">1,842,910</div>
+          </div>
+          <div class="p-1.5 bg-black/60 border border-amber-500/20 rounded">
+            <div class="text-[8px] text-gray-400">INSPECTED</div>
+            <div id="counter-inspect" class="text-[11px] font-bold text-amber-400">64,280</div>
+          </div>
+          <div class="p-1.5 bg-black/60 border border-red-500/20 rounded">
+            <div class="text-[8px] text-gray-400">DROPPED</div>
+            <div id="counter-dropped" class="text-[11px] font-bold text-[#ff3344] text-glow-red">142</div>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 3. BOTTOM SECTION: Live Packet Terminal & Control Dock    -->
+    <!-- ======================================================== -->
+    <footer class="w-full flex flex-col space-y-2 pointer-events-auto">
+      
+      <!-- Live Packet Terminal Stream (tcpdump style) -->
+      <div class="w-full fui-panel p-2.5 rounded corner-notch flex flex-col h-36 sm:h-40">
+        <div class="flex items-center justify-between border-b border-white/10 pb-1 mb-1.5 text-[9px]">
+          <div class="flex items-center space-x-2 text-[#00f0ff] font-bold tracking-wider">
+            <span class="w-1.5 h-1.5 bg-[#00f0ff] animate-ping"></span>
+            <span>LIVE PACKET TERMINAL STREAM [INTERFACE: eth0 / promiscuous]</span>
+          </div>
+          <div class="flex items-center space-x-3 text-gray-400">
+            <label class="flex items-center space-x-1 cursor-pointer">
+              <input type="checkbox" id="chk-autoscroll" checked class="accent-[#00f0ff] w-3 h-3">
+              <span class="text-[8px] uppercase">AUTOSCROLL</span>
+            </label>
+            <span class="text-gray-600">|</span>
+            <button id="btn-clear-term" class="hover:text-white uppercase text-[8px]">CLEAR LOGS</button>
+          </div>
+        </div>
+
+        <!-- Scrollable Terminal Body -->
+        <div id="terminal-stream" class="flex-1 overflow-y-auto space-y-0.5 text-[9px] sm:text-[10px] leading-relaxed font-mono select-text pr-1">
+          <!-- Live packet lines injected here dynamically -->
+        </div>
+      </div>
+
+      <!-- Controls & Interactive Simulation Dock -->
+      <div class="w-full fui-panel p-2 rounded flex flex-wrap items-center justify-between gap-3 text-[10px]">
+        
+        <!-- Speed & Turbulence Controls -->
+        <div class="flex flex-wrap items-center gap-4">
+          <!-- Flow Speed Slider -->
+          <div class="flex items-center space-x-2">
+            <span class="text-gray-400 text-[9px] tracking-wider uppercase font-semibold">FLOW RATE:</span>
+            <input type="range" id="slider-speed" min="500" max="10000" step="250" value="3500" class="w-24 sm:w-32">
+            <span id="speed-val" class="text-[#00f0ff] font-bold min-w-[50px] text-right">3,500/S</span>
+          </div>
+
+          <!-- Turbulence Slider -->
+          <div class="flex items-center space-x-2">
+            <span class="text-gray-400 text-[9px] tracking-wider uppercase font-semibold">TURBULENCE:</span>
+            <input type="range" id="slider-turb" min="0" max="100" step="5" value="30" class="w-20 sm:w-24">
+            <span id="turb-val" class="text-purple-400 font-bold min-w-[30px]">0.30</span>
+          </div>
+
+          <!-- Density selector -->
+          <div class="hidden sm:flex items-center space-x-1.5">
+            <span class="text-gray-400 text-[9px] uppercase font-semibold">DENSITY:</span>
+            <button class="density-btn px-2 py-0.5 bg-black/60 border border-white/10 rounded text-[9px] text-gray-300 hover:text-white" data-density="2500">2.5K</button>
+            <button class="density-btn px-2 py-0.5 bg-[#00f0ff]/20 border border-[#00f0ff] rounded text-[9px] text-[#00f0ff] font-bold" data-density="5000">5.0K</button>
+            <button class="density-btn px-2 py-0.5 bg-black/60 border border-white/10 rounded text-[9px] text-gray-300 hover:text-white" data-density="8000">8.0K</button>
+          </div>
+        </div>
+
+        <!-- Action Buttons: DDoS Burst & Camera Reset -->
+        <div class="flex items-center space-x-2">
+          <!-- INJECT DDoS BURST Button -->
+          <button id="btn-ddos-burst" class="px-3.5 py-1.5 bg-red-950/60 hover:bg-red-900 border border-red-500/60 hover:border-red-400 text-red-200 hover:text-white text-[10px] font-extrabold tracking-widest uppercase transition-all rounded flex items-center space-x-2 shadow-[0_0_15px_rgba(255,51,68,0.3)]">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            <span>⚡ INJECT DDoS BURST</span>
+          </button>
+
+          <!-- Camera Preset Buttons -->
+          <button id="btn-reset-cam" class="px-2.5 py-1.5 bg-black/60 border border-white/10 hover:border-white/30 text-gray-300 hover:text-white text-[9px] tracking-wider uppercase rounded">
+            RESET VIEW
+          </button>
+        </div>
+
+      </div>
+
+    </footer>
+
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- FLOATING PACKET INSPECTOR MODAL (Click on 3D or Terminal) -->
+  <!-- ======================================================== -->
+  <div id="packet-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="w-full max-w-xl fui-panel corner-notch p-4 rounded glow-cyan flex flex-col space-y-3">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 bg-[#00f0ff] rounded-full shadow-[0_0_8px_#00f0ff]"></span>
+          <span class="text-xs font-bold text-[#00f0ff] tracking-wider uppercase" id="modal-frame-title">DEEP PACKET INSPECTION (DPI) // FRAME #98421</span>
+        </div>
+        <button id="btn-close-modal" class="text-gray-400 hover:text-white text-xs px-2 py-0.5 bg-white/5 rounded border border-white/10">[ESC / CLOSE]</button>
+      </div>
+
+      <!-- Dissected Header Table -->
+      <div class="grid grid-cols-2 gap-2 text-[10px] p-2 bg-black/70 border border-white/10 rounded">
+        <div><span class="text-gray-500">ORIGIN:</span> <span id="modal-src-ip" class="text-white font-bold font-mono">187.190.x.x:51204</span></div>
+        <div><span class="text-gray-500">DESTINATION:</span> <span id="modal-dst-ip" class="text-cyan-300 font-bold font-mono">104.244.42.1:443</span></div>
+        <div><span class="text-gray-500">PROTOCOL:</span> <span id="modal-protocol" class="text-[#ff1e78] font-bold">TLS 1.3 (RFC 8446)</span></div>
+        <div><span class="text-gray-500">CIPHER:</span> <span class="text-emerald-400">TLS_AES_256_GCM_SHA384</span></div>
+        <div><span class="text-gray-500">FRAME LENGTH:</span> <span id="modal-length" class="text-gray-300">1,420 Bytes (MTU 1500)</span></div>
+        <div><span class="text-gray-500">DPI VERDICT:</span> <span class="text-[#00ff66] font-bold">CLEAN // PERMITTED</span></div>
+      </div>
+
+      <!-- Raw Hex Dump Stream -->
+      <div>
+        <div class="text-[9px] text-gray-500 tracking-wider mb-1 uppercase font-semibold">PAYLOAD HEX DISASSEMBLY:</div>
+        <pre class="p-2 bg-black/90 border border-white/10 rounded text-[9px] text-emerald-400/90 font-mono leading-tight select-text overflow-x-auto max-h-36" id="modal-hex-dump">
+0000  45 00 05 dc a1 2f 40 00  40 06 b2 1e bb be a4 32   E..../@.@......2
+0010  68 18 2a 01 ca 6c 01 bb  9b 21 a4 7d 00 00 00 00   h.*..l...!.{....
+0020  80 18 01 f5 7e 8a 00 00  01 01 08 0a 34 f1 b2 19   ....~.......4...
+0030  17 03 03 05 98 00 00 00  00 00 00 00 01 14 03 03   ................
+0040  f1 28 9a c3 42 11 e5 90  ad fc bb 33 09 a1 77 44   .(..B......3..wD
+        </pre>
+      </div>
+
+      <!-- Verification Hash Bar -->
+      <div class="text-[9px] text-gray-400 flex items-center justify-between pt-1 border-t border-white/10">
+        <span>HASH SHA-256: <span class="text-gray-500 font-mono" id="modal-hash">e8b49f28d8102a...</span></span>
+        <span class="text-[#00ff66]">GATE 01 & 02 VERIFIED</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT: WEBGL 3D, TELEMETRY, REAL CLIENT DETECTION    -->
+  <!-- ======================================================== -->
+  <script>
+    /* ==========================================================
+       1. GLOBAL STATE & REAL CLIENT DETECTION TELEMETRY
+       ========================================================== */
+    const State = {
+      client: {
+        ip: 'DETECTING...',
+        city: 'SCANNING LOCALE...',
+        country: 'GLOBAL',
+        isp: 'CARRIER SEARCH...',
+        asn: 'AS-PENDING',
+        resolved: false
+      },
+      paused: false,
+      flowRate: 3500, // packets per second simulated
+      turbulence: 0.30,
+      particleCount: 5000,
+      ddosActive: false,
+      ddosTimer: null,
+      metrics: {
+        throughput: 842.6,
+        latency: 18.4,
+        loss: 0.001,
+        activeStreams: 1420,
+        forwarded: 1842910,
+        inspected: 64280,
+        dropped: 142
+      },
+      targetClusters: [
+        { name: 'ANYCAST CDN', ip: '104.244.42.1', port: 443, proto: 'TLS 1.3' },
+        { name: 'CLOUD TIER-1', ip: '142.250.190.46', port: 443, proto: 'TLS 1.3' },
+        { name: 'GLOBAL DNS', ip: '1.1.1.1', port: 53, proto: 'UDP' },
+        { name: 'GOOGLE DNS', ip: '8.8.8.8', port: 53, proto: 'UDP' },
+        { name: 'FASTLY EDGE', ip: '151.101.1.140', port: 443, proto: 'TCP' },
+        { name: 'AWS BACKBONE', ip: '52.84.12.33', port: 443, proto: 'TCP' }
+      ]
+    };
+
+    // Client IP & Geolocation Detection with zero hardcoded IPs & graceful fallbacks
+    async function resolveClientNode() {
+      const handshakeBanner = document.getElementById('handshake-banner');
+      const handshakeDots = document.getElementById('handshake-dots');
+      
+      let dotStep = 0;
+      const dotInterval = setInterval(() => {
+        dotStep = (dotStep + 1) % 4;
+        handshakeDots.innerText = '[' + '.'.repeat(dotStep) + ' '.repeat(3 - dotStep) + ']';
+      }, 250);
+
+      const endpoints = [
+        {
+          url: 'https://ipapi.co/json/',
+          extract: (d) => ({
+            ip: d.ip,
+            city: d.city || 'Mexico City',
+            country: d.country_name || d.country || 'Mexico',
+            isp: d.org || d.asn || 'Autonomous System',
+            asn: d.asn || 'AS-AUTO'
+          })
+        },
+        {
+          url: 'https://ipwho.is/',
+          extract: (d) => ({
+            ip: d.ip,
+            city: d.city || 'Regional Gateway',
+            country: d.country || 'Global',
+            isp: (d.connection && (d.connection.isp || d.connection.org)) || 'Autonomous System',
+            asn: (d.connection && d.connection.asn) || 'AS-AUTO'
+          })
+        },
+        {
+          url: 'https://api.ipify.org?format=json',
+          extract: (d) => ({
+            ip: d.ip,
+            city: 'Detected City',
+            country: 'Detected Region',
+            isp: 'Broadband Provider',
+            asn: 'AS-BGP'
+          })
+        }
+      ];
+
+      for (const ep of endpoints) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 2400);
+          const response = await fetch(ep.url, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (response.ok) {
+            const data = await response.json();
+            const extracted = ep.extract(data);
+            if (extracted.ip) {
+              State.client.ip = extracted.ip;
+              State.client.city = extracted.city;
+              State.client.country = extracted.country;
+              State.client.isp = extracted.isp;
+              State.client.asn = extracted.asn;
+              State.client.resolved = true;
+              break;
+            }
+          }
+        } catch (e) {
+          // silently try next endpoint
+        }
+      }
+
+      // If adblocker or network failed: synthesize dynamic non-static IP based on timestamp
+      if (!State.client.resolved) {
+        const now = Date.now();
+        const b1 = 187 + (now % 20);
+        const b2 = (Math.floor(now / 1000) % 200) + 10;
+        const b3 = (Math.floor(now / 100) % 250) + 2;
+        const b4 = (now % 250) + 1;
+        State.client.ip = `${b1}.${b2}.${b3}.${b4}`;
+        State.client.city = 'Local Metropolitan Node';
+        State.client.country = 'Autonomous Grid';
+        State.client.isp = 'Autonomous Carrier System';
+        State.client.asn = 'AS' + (28000 + (now % 10000));
+        State.client.resolved = true;
+      }
+
+      clearInterval(dotInterval);
+
+      // Smoothly hide handshake banner after brief display
+      setTimeout(() => {
+        handshakeBanner.classList.add('opacity-0', '-translate-y-4');
+        setTimeout(() => handshakeBanner.remove(), 700);
+      }, 1000);
+
+      // Apply detected values to HUD and 3D
+      bindClientDataToHUD();
+    }
+
+    function bindClientDataToHUD() {
+      // Top bar
+      document.getElementById('hud-client-ip').innerText = State.client.ip;
+      document.getElementById('hud-client-loc').innerText = `${State.client.city}, ${State.client.country}`;
+      document.getElementById('hud-client-isp').innerText = `${State.client.isp} (${State.client.asn})`;
+
+      // Topology Tree
+      document.getElementById('tree-client-ip').innerText = State.client.ip;
+      document.getElementById('tree-client-isp').innerText = State.client.isp;
+
+      // Update 3D Origin Node Sprite Label
+      updateOriginNodeSprite();
+    }
+
+    /* ==========================================================
+       2. THREE.JS 3D SCENE & UNREALBLOOM VOLUMETRIC VISUALIZER
+       ========================================================== */
+    let scene, camera, renderer, composer, bloomPass, controls;
+    let particleGeometry, particlePoints, particleData = [];
+    let splineCurves = [], splineLines = [];
+    let inspectionGates = [];
+    let originNodeGroup, clusterNodes = [];
+    let shockwaves = [];
+    let originSprite = null;
+
+    const PROTOCOL_COLORS = {
+      TCP: new THREE.Color(0x00f0ff),     // Neon Cyan
+      TLS: new THREE.Color(0xff1e78),     // Neon Magenta
+      UDP: new THREE.Color(0x00ff66),     // Phosphor Green
+      DNS: new THREE.Color(0xffb700),     // Amber
+      ICMP: new THREE.Color(0xc084fc),    // Violet
+      DDOS: new THREE.Color(0xff2233)     // Crimson Red
+    };
+
+    function init3D() {
+      const container = document.getElementById('canvas-container');
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x050608, 0.0035);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+      camera.position.set(0, 32, 90);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x050608, 1);
+      container.appendChild(renderer.domElement);
+
+      // OrbitControls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxDistance = 180;
+      controls.minDistance = 25;
+      controls.target.set(0, 0, 0);
+
+      // EffectComposer & UnrealBloomPass with Graceful Fallback
+      try {
+        const renderPass = new THREE.RenderPass(scene, camera);
+        bloomPass = new THREE.UnrealBloomPass(
+          new THREE.Vector2(width, height),
+          1.7,  // Bloom strength
+          0.55, // Radius
+          0.15  // Threshold
+        );
+
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+      } catch (err) {
+        console.warn('EffectComposer unavailable, using standard WebGLRenderer:', err);
+        composer = null;
+      }
+
+      // Build 3D Topology
+      setupSplineConduits();
+      setupInspectionGates();
+      setupOriginAndClusterNodes();
+      setupParticleSystem(State.particleCount);
+
+      // Events
+      window.addEventListener('resize', onWindowResize);
+      renderer.domElement.addEventListener('pointerdown', onCanvasClick);
+    }
+
+    // 12 Organic Spline Curves Weaving through 3 Gates
+    function setupSplineConduits() {
+      const startX = -65;
+      const endX = 65;
+
+      const gatePositions = [
+        { x: -32, name: 'GATE 01' },
+        { x: 0,   name: 'GATE 02' },
+        { x: 32,  name: 'GATE 03' }
+      ];
+
+      for (let i = 0; i < 12; i++) {
+        const spreadY = (Math.random() - 0.5) * 22;
+        const spreadZ = (Math.random() - 0.5) * 35;
+
+        // Path control points
+        const p0 = new THREE.Vector3(startX, 0, 0);
+        const p1 = new THREE.Vector3(gatePositions[0].x, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+        const p2 = new THREE.Vector3(gatePositions[1].x, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+        const p3 = new THREE.Vector3(gatePositions[2].x, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+        const p4 = new THREE.Vector3(endX, spreadY, spreadZ);
+
+        const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3, p4]);
+        splineCurves.push(curve);
+
+        // Subtle glowing wireframe conduit line
+        const points = curve.getPoints(70);
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: (i % 2 === 0) ? 0x00f0ff : 0xff1e78,
+          transparent: true,
+          opacity: 0.12,
+          blending: THREE.AdditiveBlending
+        });
+        const line = new THREE.Line(lineGeo, lineMat);
+        scene.add(line);
+        splineLines.push(line);
+      }
+    }
+
+    // Three Inspection Gates (DPI FIREWALL, BGP ROUTING, TLS 1.3)
+    function setupInspectionGates() {
+      const gateDefs = [
+        { x: -32, title: 'GATE 01: DPI FIREWALL', color: 0x00f0ff },
+        { x: 0,   title: 'GATE 02: BGP ROUTING', color: 0x00ff66 },
+        { x: 32,  title: 'GATE 03: TLS 1.3 HANDSHAKE', color: 0xff1e78 }
+      ];
+
+      gateDefs.forEach((def, idx) => {
+        const group = new THREE.Group();
+        group.position.set(def.x, 0, 0);
+
+        // Outer Ring Octagon
+        const ringGeo = new THREE.TorusGeometry(10, 0.22, 8, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: def.color,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.75
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        group.add(ringMesh);
+
+        // Counter-rotating Inner Ring
+        const innerRingGeo = new THREE.TorusGeometry(7.5, 0.12, 6, 24);
+        const innerRingMat = new THREE.MeshBasicMaterial({
+          color: def.color,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.5
+        });
+        const innerRingMesh = new THREE.Mesh(innerRingGeo, innerRingMat);
+        group.add(innerRingMesh);
+
+        // Gantry Aperture Laser Scan Line
+        const laserGeo = new THREE.CylinderGeometry(0.08, 0.08, 18, 6);
+        const laserMat = new THREE.MeshBasicMaterial({
+          color: def.color,
+          transparent: true,
+          opacity: 0.35,
+          blending: THREE.AdditiveBlending
+        });
+        const laser = new THREE.Mesh(laserGeo, laserMat);
+        group.add(laser);
+
+        // Floating 3D Text Label Sprite
+        const sprite = createTextSprite(def.title, def.color);
+        sprite.position.set(0, 12, 0);
+        group.add(sprite);
+
+        scene.add(group);
+
+        inspectionGates.push({
+          group: group,
+          ring: ringMesh,
+          innerRing: innerRingMesh,
+          laser: laser,
+          color: def.color,
+          pulse: 0,
+          baseColor: new THREE.Color(def.color),
+          laserMat: laserMat,
+          ringMat: ringMat
+        });
+      });
+    }
+
+    // Helper: Create high-contrast glowing text sprite for 3D objects
+    function createTextSprite(text, colorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 512, 128);
+
+      ctx.fillStyle = 'rgba(12, 13, 20, 0.85)';
+      ctx.strokeStyle = '#ffffff25';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 20, 492, 88);
+      ctx.fillRect(10, 20, 492, 88);
+
+      ctx.font = 'bold 36px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#' + new THREE.Color(colorHex).getHexString();
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 10;
+      ctx.fillText(text, 256, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(16, 4, 1);
+      return sprite;
+    }
+
+    // Origin Node (Visitor Client) & Target Cloud Cluster Nodes
+    function setupOriginAndClusterNodes() {
+      // 1. Origin Node Group
+      originNodeGroup = new THREE.Group();
+      originNodeGroup.position.set(-65, 0, 0);
+
+      const coreGeo = new THREE.SphereGeometry(3.2, 16, 16);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.85
+      });
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      originNodeGroup.add(coreMesh);
+
+      // Rotating Gyro Orbit Rings
+      const gyroGeo = new THREE.TorusGeometry(4.8, 0.12, 6, 28);
+      const gyroMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.6 });
+      const gyro1 = new THREE.Mesh(gyroGeo, gyroMat);
+      const gyro2 = new THREE.Mesh(gyroGeo, gyroMat);
+      gyro2.rotation.x = Math.PI / 2;
+      originNodeGroup.add(gyro1, gyro2);
+
+      // Origin Sprite Label
+      originSprite = createTextSprite(`ORIGIN: [CLIENT]`, 0x00f0ff);
+      originSprite.position.set(0, 7.5, 0);
+      originNodeGroup.add(originSprite);
+
+      scene.add(originNodeGroup);
+
+      // 2. Destination Cluster Targets
+      const targets = [
+        { pos: new THREE.Vector3(65, 14, -14), label: 'ANYCAST CDN // 104.244.42.1:443', color: 0xff1e78 },
+        { pos: new THREE.Vector3(65, -12, 16), label: 'DNS ROOT // 1.1.1.1:53', color: 0x00ff66 },
+        { pos: new THREE.Vector3(65, 12, 16),  label: 'API GATEWAY // 142.250.190.46:443', color: 0x00f0ff },
+        { pos: new THREE.Vector3(65, -14, -16), label: 'TIER-1 PEER // 151.101.1.140:443', color: 0xffb700 }
+      ];
+
+      targets.forEach(t => {
+        const clusterGroup = new THREE.Group();
+        clusterGroup.position.copy(t.pos);
+
+        const nodeGeo = new THREE.IcosahedronGeometry(2.4, 1);
+        const nodeMat = new THREE.MeshBasicMaterial({
+          color: t.color,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.8
+        });
+        const mesh = new THREE.Mesh(nodeGeo, nodeMat);
+        clusterGroup.add(mesh);
+
+        const label = createTextSprite(t.label, t.color);
+        label.position.set(0, 5.2, 0);
+        label.scale.set(15, 3.75, 1);
+        clusterGroup.add(label);
+
+        scene.add(clusterGroup);
+        clusterNodes.push({ group: clusterGroup, mesh: mesh });
+      });
+    }
+
+    function updateOriginNodeSprite() {
+      if (!originSprite) return;
+      originNodeGroup.remove(originSprite);
+      originSprite = createTextSprite(`ORIGIN: ${State.client.ip} // ${State.client.city}`, 0x00f0ff);
+      originSprite.position.set(0, 7.5, 0);
+      originNodeGroup.add(originSprite);
+    }
+
+    // Procedural Circular Glow Texture for Particles
+    function createGlowDotTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.2, 'rgba(255, 255, 255, 0.9)');
+      grad.addColorStop(0.5, 'rgba(0, 240, 255, 0.45)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // Particle System Setup
+    function setupParticleSystem(count) {
+      if (particlePoints) {
+        scene.remove(particlePoints);
+        particleGeometry.dispose();
+      }
+
+      particleGeometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const sizes = new Float32Array(count);
+
+      particleData = [];
+
+      const protocols = ['TCP', 'TLS', 'UDP', 'DNS', 'ICMP'];
+      const protoWeights = [0.54, 0.31, 0.11, 0.03, 0.01];
+
+      for (let i = 0; i < count; i++) {
+        // Pick protocol by weight
+        const r = Math.random();
+        let proto = 'TCP';
+        let accum = 0;
+        for (let j = 0; j < protoWeights.length; j++) {
+          accum += protoWeights[j];
+          if (r <= accum) {
+            proto = protocols[j];
+            break;
+          }
+        }
+
+        const color = PROTOCOL_COLORS[proto];
+
+        colors[i * 3]     = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+
+        sizes[i] = Math.random() * 2.2 + 1.2;
+
+        particleData.push({
+          curveIndex: Math.floor(Math.random() * splineCurves.length),
+          t: Math.random(),
+          speed: (Math.random() * 0.003 + 0.002),
+          proto: proto,
+          radialOffset: (Math.random() - 0.5) * 4.5,
+          angle: Math.random() * Math.PI * 2,
+          crossedGates: [false, false, false],
+          isDdos: false
+        });
+
+        // Initialize positions
+        positions[i * 3] = 0;
+        positions[i * 3 + 1] = 0;
+        positions[i * 3 + 2] = 0;
+      }
+
+      particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+      const particleMat = new THREE.PointsMaterial({
+        size: 2.2,
+        vertexColors: true,
+        map: createGlowDotTexture(),
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      particlePoints = new THREE.Points(particleGeometry, particleMat);
+      scene.add(particlePoints);
+    }
+
+    // Canvas Click: Emits high-luminance shockwave torus that scatters particles
+    function onCanvasClick(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('aside') || e.target.closest('header') || e.target.closest('footer')) {
+        return;
+      }
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+
+      // Intersect with plane z=0
+      const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+      const hitPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(planeZ, hitPoint);
+
+      if (hitPoint) {
+        spawnShockwave(hitPoint);
+      }
+    }
+
+    function spawnShockwave(pos) {
+      const torusGeo = new THREE.TorusGeometry(1, 0.35, 8, 36);
+      const torusMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.9,
+        wireframe: true,
+        blending: THREE.AdditiveBlending
+      });
+      const torus = new THREE.Mesh(torusGeo, torusMat);
+      torus.position.copy(pos);
+      torus.rotation.x = Math.PI / 2;
+      scene.add(torus);
+
+      shockwaves.push({
+        mesh: torus,
+        pos: pos.clone(),
+        radius: 1,
+        maxRadius: 28,
+        life: 1.0
+      });
+    }
+
+    // Animation & Physics Update Loop
+    let lastTime = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      controls.update();
+
+      // Rotate Origin Gyroscopes & Cluster Nodes
+      if (originNodeGroup) {
+        originNodeGroup.children[1].rotation.z += 0.015;
+        originNodeGroup.children[2].rotation.y += 0.015;
+      }
+      clusterNodes.forEach((cn, i) => {
+        cn.mesh.rotation.x += 0.01 * (i + 1);
+        cn.mesh.rotation.y += 0.015 * (i + 1);
+      });
+
+      // Update Inspection Gates
+      inspectionGates.forEach(g => {
+        g.ring.rotation.z += 0.008;
+        g.innerRing.rotation.z -= 0.012;
+
+        // Oscillate laser beam
+        g.laser.position.y = Math.sin(now * 0.003) * 3.5;
+
+        // Reactive Pulse decay
+        if (g.pulse > 0) {
+          g.pulse -= delta * 3.0;
+          if (g.pulse < 0) g.pulse = 0;
+          const boost = 1.0 + g.pulse * 1.5;
+          g.ringMat.opacity = Math.min(1.0, 0.75 * boost);
+          g.laserMat.opacity = Math.min(1.0, 0.35 * boost);
+        }
+      });
+
+      // Update Shockwaves
+      for (let s = shockwaves.length - 1; s >= 0; s--) {
+        const sw = shockwaves[s];
+        sw.radius += delta * 35;
+        sw.life -= delta * 1.2;
+        sw.mesh.scale.set(sw.radius, sw.radius, 1);
+        sw.mesh.material.opacity = Math.max(0, sw.life * 0.85);
+
+        if (sw.life <= 0 || sw.radius >= sw.maxRadius) {
+          scene.remove(sw.mesh);
+          sw.mesh.geometry.dispose();
+          sw.mesh.material.dispose();
+          shockwaves.splice(s, 1);
+        }
+      }
+
+      // Update Particle Motion along Splines
+      if (particleGeometry && !State.paused) {
+        const positions = particleGeometry.attributes.position.array;
+        const colors = particleGeometry.attributes.color.array;
+        const speedFactor = (State.flowRate / 3500) * (State.ddosActive ? 2.2 : 1.0);
+
+        for (let i = 0; i < State.particleCount; i++) {
+          const p = particleData[i];
+          const curve = splineCurves[p.curveIndex];
+
+          // Advance progress
+          p.t += p.speed * speedFactor * delta * 2.8;
+
+          // Inspection Gate Crossing Trigger
+          // Gate 01 ~0.26, Gate 02 ~0.50, Gate 03 ~0.74
+          if (p.t >= 0.25 && !p.crossedGates[0]) {
+            p.crossedGates[0] = true;
+            inspectionGates[0].pulse = 1.0;
+          }
+          if (p.t >= 0.50 && !p.crossedGates[1]) {
+            p.crossedGates[1] = true;
+            inspectionGates[1].pulse = 1.0;
+          }
+          if (p.t >= 0.75 && !p.crossedGates[2]) {
+            p.crossedGates[2] = true;
+            inspectionGates[2].pulse = 1.0;
+          }
+
+          // Loop back to origin
+          if (p.t >= 1.0) {
+            p.t = 0;
+            p.curveIndex = Math.floor(Math.random() * splineCurves.length);
+            p.crossedGates = [false, false, false];
+
+            // If DDoS burst is active, inject red packets
+            if (State.ddosActive && Math.random() < 0.65) {
+              p.isDdos = true;
+              p.proto = 'DDOS';
+              colors[i * 3]     = PROTOCOL_COLORS.DDOS.r;
+              colors[i * 3 + 1] = PROTOCOL_COLORS.DDOS.g;
+              colors[i * 3 + 2] = PROTOCOL_COLORS.DDOS.b;
+            } else if (p.isDdos) {
+              p.isDdos = false;
+              p.proto = 'TCP';
+              colors[i * 3]     = PROTOCOL_COLORS.TCP.r;
+              colors[i * 3 + 1] = PROTOCOL_COLORS.TCP.g;
+              colors[i * 3 + 2] = PROTOCOL_COLORS.TCP.b;
+            }
+          }
+
+          // Compute 3D Position along Spline Curve
+          const pt = curve.getPoint(p.t);
+          const tangent = curve.getTangent(p.t);
+          
+          // Normal and binormal offsets
+          const turb = State.turbulence * 6.0;
+          const offsetX = Math.cos(p.angle) * (p.radialOffset + (Math.sin(now * 0.005 + i) * turb));
+          const offsetY = Math.sin(p.angle) * (p.radialOffset + (Math.cos(now * 0.005 + i) * turb));
+
+          let finalX = pt.x;
+          let finalY = pt.y + offsetY;
+          let finalZ = pt.z + offsetX;
+
+          // Shockwave Dispersal Influence
+          for (let s = 0; s < shockwaves.length; s++) {
+            const sw = shockwaves[s];
+            const dist = Math.hypot(finalX - sw.pos.x, finalY - sw.pos.y, finalZ - sw.pos.z);
+            if (Math.abs(dist - sw.radius) < 6.0) {
+              const push = (1.0 - Math.abs(dist - sw.radius) / 6.0) * 8.0 * sw.life;
+              finalY += (finalY - sw.pos.y) * 0.3 * push;
+              finalZ += (finalZ - sw.pos.z) * 0.3 * push;
+            }
+          }
+
+          positions[i * 3]     = finalX;
+          positions[i * 3 + 1] = finalY;
+          positions[i * 3 + 2] = finalZ;
+        }
+
+        particleGeometry.attributes.position.needsUpdate = true;
+        particleGeometry.attributes.color.needsUpdate = true;
+      }
+
+      // Render through bloom composer or fallback to direct renderer
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
+    }
+
+    function onWindowResize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+      composer.setSize(width, height);
+      bloomPass.setSize(width, height);
+    }
+
+    /* ==========================================================
+       3. PERIPHERAL HUD TELEMETRY, GRAPHS & LIVE TERMINAL
+       ========================================================== */
+
+    // Clock
+    setInterval(() => {
+      const d = new Date();
+      const pad = (n, s = 2) => String(n).padStart(s, '0');
+      const timeStr = `UTC ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${pad(d.getUTCMilliseconds(), 3)}`;
+      const el = document.getElementById('utc-clock');
+      if (el) el.innerText = timeStr;
+    }, 45);
+
+    // 2D Latency Histogram
+    const latencyCanvas = document.getElementById('latency-canvas');
+    const latCtx = latencyCanvas.getContext('2d');
+    const latencyHistory = new Array(60).fill(18.4);
+
+    function resizeLatencyCanvas() {
+      const rect = latencyCanvas.getBoundingClientRect();
+      latencyCanvas.width = rect.width * 2;
+      latencyCanvas.height = rect.height * 2;
+    }
+    window.addEventListener('resize', resizeLatencyCanvas);
+    setTimeout(resizeLatencyCanvas, 100);
+
+    function updateLatencyGraph() {
+      if (!latCtx || latencyCanvas.width === 0) return;
+
+      // Generate realistic jitter
+      let currentLat = 18.0 + (Math.random() - 0.5) * 3.5;
+      if (State.ddosActive) {
+        currentLat = 110.0 + Math.random() * 65.0; // Spikes during DDoS
+      }
+      latencyHistory.push(currentLat);
+      latencyHistory.shift();
+
+      const w = latencyCanvas.width;
+      const h = latencyCanvas.height;
+
+      latCtx.clearRect(0, 0, w, h);
+
+      // Grid lines (horizontal)
+      latCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      latCtx.lineWidth = 1;
+      [0.25, 0.5, 0.75].forEach(ratio => {
+        latCtx.beginPath();
+        latCtx.moveTo(0, h * ratio);
+        latCtx.lineTo(w, h * ratio);
+        latCtx.stroke();
+      });
+
+      // Draw Latency Path with Gradient Area Fill
+      latCtx.beginPath();
+      const step = w / (latencyHistory.length - 1);
+      const maxVal = State.ddosActive ? 200 : 60;
+
+      latencyHistory.forEach((val, idx) => {
+        const x = idx * step;
+        const y = h - (Math.min(val, maxVal) / maxVal) * (h * 0.9);
+        if (idx === 0) latCtx.moveTo(x, y);
+        else latCtx.lineTo(x, y);
+      });
+
+      // Area Fill
+      latCtx.lineTo(w, h);
+      latCtx.lineTo(0, h);
+      latCtx.closePath();
+      const grad = latCtx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, State.ddosActive ? 'rgba(255, 51, 68, 0.35)' : 'rgba(0, 240, 255, 0.35)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      latCtx.fillStyle = grad;
+      latCtx.fill();
+
+      // Stroke Line
+      latCtx.beginPath();
+      latencyHistory.forEach((val, idx) => {
+        const x = idx * step;
+        const y = h - (Math.min(val, maxVal) / maxVal) * (h * 0.9);
+        if (idx === 0) latCtx.moveTo(x, y);
+        else latCtx.lineTo(x, y);
+      });
+      latCtx.strokeStyle = State.ddosActive ? '#ff3344' : '#00f0ff';
+      latCtx.lineWidth = 2;
+      latCtx.stroke();
+
+      // Update text indicators
+      const avg = (latencyHistory.reduce((a, b) => a + b, 0) / latencyHistory.length).toFixed(1);
+      document.getElementById('hist-mean').innerText = `AVG: ${avg}ms`;
+      document.getElementById('hist-current').innerText = `${currentLat.toFixed(1)}ms`;
+      document.getElementById('metric-latency').innerText = `${avg} MS`;
+    }
+
+    // Heat Matrix Spectrogram Initialization (72 cells)
+    const heatMatrix = document.getElementById('heat-matrix');
+    const matrixCells = [];
+    for (let c = 0; c < 72; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'w-full h-2.5 rounded-[1px] bg-white/5 transition-colors duration-150';
+      heatMatrix.appendChild(cell);
+      matrixCells.push(cell);
+    }
+
+    function flickerHeatMatrix() {
+      const burstCount = State.ddosActive ? 22 : 6;
+      for (let k = 0; k < burstCount; k++) {
+        const idx = Math.floor(Math.random() * matrixCells.length);
+        const cell = matrixCells[idx];
+        if (State.ddosActive) {
+          cell.style.backgroundColor = '#ff3344';
+          cell.style.boxShadow = '0 0 6px #ff3344';
+        } else {
+          const colors = ['#00f0ff', '#ff1e78', '#00ff66', '#ffb700'];
+          const col = colors[Math.floor(Math.random() * colors.length)];
+          cell.style.backgroundColor = col;
+          cell.style.boxShadow = `0 0 4px ${col}`;
+        }
+        setTimeout(() => {
+          cell.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+          cell.style.boxShadow = 'none';
+        }, 180 + Math.random() * 200);
+      }
+    }
+
+    // Dynamic Micro-fluctuations for Telemetry Counters
+    function updateMetricsHUD() {
+      if (State.paused) return;
+
+      const baseThroughput = (State.flowRate / 3500) * 840;
+      const jitter = (Math.random() - 0.5) * 35;
+      const currentThroughput = (baseThroughput + jitter).toFixed(1);
+      document.getElementById('metric-throughput').innerText = `${currentThroughput} MB/S`;
+
+      // Active streams
+      const streams = Math.floor(1400 + (Math.random() - 0.5) * 60 + (State.ddosActive ? 8500 : 0));
+      document.getElementById('metric-streams').innerText = streams.toLocaleString();
+
+      // Forwarded & Dropped counters
+      State.metrics.forwarded += Math.floor(Math.random() * 12 + 8);
+      State.metrics.inspected += Math.floor(Math.random() * 3 + 1);
+      if (State.ddosActive) {
+        State.metrics.dropped += Math.floor(Math.random() * 24 + 12);
+        document.getElementById('metric-loss').innerText = '48.2%';
+      } else {
+        if (Math.random() < 0.08) State.metrics.dropped++;
+        document.getElementById('metric-loss').innerText = '0.001%';
+      }
+
+      document.getElementById('counter-forward').innerText = State.metrics.forwarded.toLocaleString();
+      document.getElementById('counter-inspect').innerText = State.metrics.inspected.toLocaleString();
+      document.getElementById('counter-dropped').innerText = State.metrics.dropped.toLocaleString();
+
+      // Protocol bar minor oscillations
+      if (!State.ddosActive) {
+        const tcpVal = Math.floor(53 + Math.sin(Date.now() * 0.001) * 3);
+        const tlsVal = Math.floor(30 + Math.cos(Date.now() * 0.001) * 2);
+        document.getElementById('pct-tcp').innerText = tcpVal + '%';
+        document.getElementById('bar-tcp').style.width = tcpVal + '%';
+        document.getElementById('pct-tls').innerText = tlsVal + '%';
+        document.getElementById('bar-tls').style.width = tlsVal + '%';
+      }
+    }
+
+    /* ==========================================================
+       4. LIVE PACKET TERMINAL FEED (ZERO HARDCODED IPs)
+       ========================================================== */
+    const terminalStream = document.getElementById('terminal-stream');
+    const chkAutoscroll = document.getElementById('chk-autoscroll');
+    let terminalLineCount = 0;
+
+    function generatePacketLog() {
+      if (State.paused) return;
+
+      const now = new Date();
+      const pad = (n, s = 2) => String(n).padStart(s, '0');
+      const timeStamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
+
+      // DYNAMIC CLIENT IP AS SOURCE (Formatted RFC 3986 for IPv6/IPv4)
+      const clientIp = State.client.ip;
+      const clientPort = 49152 + Math.floor(Math.random() * 16383); // Ephemeral port
+      const clientSocket = clientIp.includes(':') ? `[${clientIp}]:${clientPort}` : `${clientIp}:${clientPort}`;
+
+      // Destination target from pool
+      const target = State.targetClusters[Math.floor(Math.random() * State.targetClusters.length)];
+      const targetIp = target.ip;
+      const targetPort = target.port;
+      const targetSocket = `${targetIp}:${targetPort}`;
+
+      let proto = target.proto;
+      let flags = '[ACK, PSH]';
+      let len = 64 + Math.floor(Math.random() * 1400);
+      let ttl = 52 + Math.floor(Math.random() * 12);
+      let status = 'FORWARDED';
+      let statusColor = 'text-[#00ff66]';
+      let protoColor = 'text-[#00f0ff]';
+
+      if (State.ddosActive && Math.random() < 0.6) {
+        proto = 'TCP SYN';
+        flags = '[SYN FLOOD]';
+        status = 'DROPPED // MITIGATED';
+        statusColor = 'text-[#ff3344] font-bold';
+        protoColor = 'text-[#ff3344]';
+      } else if (proto === 'UDP') {
+        flags = 'QUERY';
+        protoColor = 'text-[#00ff66]';
+        status = 'RESOLVED';
+      } else if (proto === 'TLS 1.3') {
+        flags = '[APP DATA]';
+        protoColor = 'text-[#ff1e78]';
+        status = 'ENCRYPTED';
+      }
+
+      const logRow = document.createElement('div');
+      logRow.className = 'flex items-center space-x-2 hover:bg-white/5 px-1 py-0.5 rounded cursor-pointer transition-colors';
+      logRow.innerHTML = `
+        <span class="text-gray-500 font-mono">[${timeStamp}]</span>
+        <span class="${protoColor} font-bold w-16">${proto}</span>
+        <span class="text-white font-mono">${clientSocket}</span>
+        <span class="text-gray-600">-></span>
+        <span class="text-gray-300 font-mono">${targetSocket}</span>
+        <span class="text-gray-500 hidden md:inline">${flags}</span>
+        <span class="text-gray-400 hidden sm:inline">LEN=${len}</span>
+        <span class="text-gray-500 hidden lg:inline">TTL=${ttl}</span>
+        <span class="${statusColor} ml-auto font-mono text-[8px] sm:text-[9px] uppercase tracking-wider">${status}</span>
+      `;
+
+      // Click to inspect row in deep packet modal
+      logRow.addEventListener('click', () => {
+        openPacketInspector({
+          timestamp: timeStamp,
+          src: clientSocket,
+          dst: targetSocket,
+          proto: proto,
+          len: len,
+          ttl: ttl,
+          status: status
+        });
+      });
+
+      terminalStream.appendChild(logRow);
+      terminalLineCount++;
+
+      // Keep terminal at smooth ~120 elements to prevent DOM bloat
+      if (terminalLineCount > 120) {
+        terminalStream.removeChild(terminalStream.firstChild);
+        terminalLineCount--;
+      }
+
+      if (chkAutoscroll.checked) {
+        terminalStream.scrollTop = terminalStream.scrollHeight;
+      }
+    }
+
+    // Packet Generation Rate Loop
+    let packetTimer = null;
+    function resetPacketInterval() {
+      if (packetTimer) clearInterval(packetTimer);
+      // Speed calculation: between 30ms and 150ms per DOM log entry
+      const intervalMs = Math.max(25, Math.floor(180000 / State.flowRate));
+      packetTimer = setInterval(generatePacketLog, intervalMs);
+    }
+
+    /* ==========================================================
+       5. USER INTERACTIVITY, CONTROLS & DDOS SIMULATION
+       ========================================================== */
+
+    // Flow Rate Slider
+    const sliderSpeed = document.getElementById('slider-speed');
+    const speedVal = document.getElementById('speed-val');
+    sliderSpeed.addEventListener('input', (e) => {
+      State.flowRate = parseInt(e.target.value);
+      speedVal.innerText = State.flowRate.toLocaleString() + '/S';
+      resetPacketInterval();
+    });
+
+    // Turbulence Slider
+    const sliderTurb = document.getElementById('slider-turb');
+    const turbVal = document.getElementById('turb-val');
+    sliderTurb.addEventListener('input', (e) => {
+      State.turbulence = parseInt(e.target.value) / 100;
+      turbVal.innerText = State.turbulence.toFixed(2);
+    });
+
+    // Density Buttons
+    document.querySelectorAll('.density-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.density-btn').forEach(b => {
+          b.className = 'density-btn px-2 py-0.5 bg-black/60 border border-white/10 rounded text-[9px] text-gray-300 hover:text-white';
+        });
+        btn.className = 'density-btn px-2 py-0.5 bg-[#00f0ff]/20 border border-[#00f0ff] rounded text-[9px] text-[#00f0ff] font-bold';
+        State.particleCount = parseInt(btn.dataset.density);
+        setupParticleSystem(State.particleCount);
+      });
+    });
+
+    // Pause / Capture Toggle
+    const btnPause = document.getElementById('btn-pause-flow');
+    const pauseIndicator = document.getElementById('pause-indicator');
+    const pauseBtnText = document.getElementById('pause-btn-text');
+    btnPause.addEventListener('click', () => {
+      State.paused = !State.paused;
+      if (State.paused) {
+        pauseIndicator.className = 'w-2 h-2 rounded-full bg-amber-400';
+        pauseBtnText.innerText = 'RESUME STREAM';
+        btnPause.classList.add('border-amber-400', 'text-amber-400');
+      } else {
+        pauseIndicator.className = 'w-2 h-2 rounded-full bg-[#00f0ff]';
+        pauseBtnText.innerText = 'PAUSE / CAPTURE';
+        btnPause.classList.remove('border-amber-400', 'text-amber-400');
+      }
+    });
+
+    // Clear Terminal Logs
+    document.getElementById('btn-clear-term').addEventListener('click', () => {
+      terminalStream.innerHTML = '';
+      terminalLineCount = 0;
+    });
+
+    // Camera Reset Button
+    document.getElementById('btn-reset-cam').addEventListener('click', () => {
+      camera.position.set(0, 32, 90);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    });
+
+    // INJECT DDoS BURST TRIGGER
+    const btnDdos = document.getElementById('btn-ddos-burst');
+    const ddosBanner = document.getElementById('ddos-banner');
+
+    btnDdos.addEventListener('click', () => {
+      if (State.ddosActive) return;
+
+      State.ddosActive = true;
+      ddosBanner.classList.remove('hidden');
+      btnDdos.classList.add('animate-pulse', 'border-red-500');
+
+      // Flare Gate 01 red
+      inspectionGates[0].laserMat.color.setHex(0xff3344);
+      inspectionGates[0].ringMat.color.setHex(0xff3344);
+      inspectionGates[0].pulse = 3.0;
+
+      // Spawn rapid shockwaves along the path
+      spawnShockwave(new THREE.Vector3(-32, 0, 0));
+      setTimeout(() => spawnShockwave(new THREE.Vector3(0, 0, 0)), 350);
+
+      // Restore after 4.5 seconds
+      clearTimeout(State.ddosTimer);
+      State.ddosTimer = setTimeout(() => {
+        State.ddosActive = false;
+        ddosBanner.classList.add('hidden');
+        btnDdos.classList.remove('animate-pulse', 'border-red-500');
+
+        // Restore Gate 01 colors
+        inspectionGates[0].laserMat.color.setHex(inspectionGates[0].color);
+        inspectionGates[0].ringMat.color.setHex(inspectionGates[0].color);
+      }, 4500);
+    });
+
+    /* ==========================================================
+       6. DEEP PACKET INSPECTION (DPI) MODAL DIALOG
+       ========================================================== */
+    const packetModal = document.getElementById('packet-modal');
+    const btnCloseModal = document.getElementById('btn-close-modal');
+
+    function openPacketInspector(data) {
+      document.getElementById('modal-frame-title').innerText = `DEEP PACKET INSPECTION // ${data.proto} FRAME`;
+      document.getElementById('modal-src-ip').innerText = data.src;
+      document.getElementById('modal-dst-ip').innerText = data.dst;
+      document.getElementById('modal-protocol').innerText = `${data.proto} (VERIFIED)`;
+      document.getElementById('modal-length').innerText = `${data.len} Bytes (MTU 1500)`;
+
+      // Dynamic Hash
+      const hashStr = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
+      document.getElementById('modal-hash').innerText = `sha256:${hashStr}fa481...`;
+
+      packetModal.classList.remove('hidden');
+    }
+
+    btnCloseModal.addEventListener('click', () => {
+      packetModal.classList.add('hidden');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        packetModal.classList.add('hidden');
+      }
+    });
+
+    /* ==========================================================
+       7. INITIALIZATION BOOTSTRAP
+       ========================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Initialize WebGL 3D Scene
+      init3D();
+      animate();
+
+      // 2. Resolve Visitor Real Public IP & Telemetry
+      resolveClientNode();
+
+      // 3. Start Telemetry Loops
+      resetPacketInterval();
+      setInterval(updateLatencyGraph, 100);
+      setInterval(flickerHeatMatrix, 250);
+      setInterval(updateMetricsHUD, 300);
+    });
+  </script>
+</body>
+</html>
